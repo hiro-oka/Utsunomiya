@@ -1,0 +1,440 @@
+---
+title: '宇都宮先生の研究'
+author: "Hiroshi Okamoto" 
+date: "`r format(Sys.time(), '%Y/%m/%d')`"
+output:
+  html_document:
+    toc: yes
+    toc_float: yes
+  pdf_document:
+    toc: yes
+editor_options:
+  chunk_output_type: inline
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,  message = FALSE,　warning = FALSE)
+```
+
+
+```{r, eval=T, echo=F, warning=F}
+# Lodad data
+library(tidyverse)
+#https://heavywatal.github.io/rstats/ggplot2.html
+library(gridExtra) 
+library(readxl) 
+library(mgcv)
+library(tableone) 
+library(tidylog)　
+library(summarytools)
+#https://niszet.github.io/TokyoR72LT/TokyoR72LT.html#/2/1
+library(skimr)
+library(patchwork)
+library(see)
+library(inspectdf)
+library(lubridate)
+library(kableExtra)
+library(MESS)
+library(plotly)
+library(gghighlight)
+library(ggThemeAssist)
+library(gtsummary)
+library(gt)
+library(flextable)
+library(psy)
+library(psych)
+library(maptools)
+options(width=10000)
+```
+
+```{r, eval=T, echo=F, warning=F}
+#データ読み込み  
+df1 <- read_excel("集計表.xlsx", sheet = "統合")
+df2 <- read_excel("集計表.xlsx", sheet = "基本データ")
+
+#データ結合
+df3 <- left_join(df1, df2, by = "ID")
+
+#必要なデータだけに絞る
+df <- df3 %>% 
+  select("施設コード", "入院回数.x", "心不全症状の有無.x", 
+"心不全症状", "薬物自己中断.x", "心不全教室.x", 
+"喫煙.x", "BNP.x", "区分.x", "EF.x", "NYHA.x", "緊急入院.x", 
+"入院自己中断.x", "禁煙.x", "齲歯.x", "手術延期.x", 
+"残薬不一致.x", "病名文字.x", "病名コード...20", 
+"病名コード...21", "大動脈病変.x", "術式文字.x", 
+"MICS.x", "術式コード...25", "術式コード...26", "術式コード...27", 
+"GR.x", "虚血性心疾患.x", "CABG.x", "年齢.x", "性別.x", 
+"結婚.x", "同居.x", "１症状", "２必要性", "3体調変化", 
+"4水分量", "5医師に質問", "6家族に話す", "7弁について", 
+"8予防法", "9水分量測定", "10看護師に伝える", 
+"11医師に伝えｒｙ", "12体重測定", "13運動量", "14家族に話す", 
+"15治療薬", "16リスク", "17体重報告", "18身体機能低下", 
+"19脈", "20身体機能予防", "21弁膜症", "22手術", "23体調連絡", 
+"24看護師に話す", "25運動", "26塩分", "27減塩醤油", 
+"28リスク", "29弁の状態", "30脈", "1-1薬の質問", 
+"1-2薬の思い", "1-3薬の履歴", "2-4薬の質問", "2-5薬の副作用", 
+"2-6薬の必要性", "2-7薬の工夫", "2-8薬の情報", "3-9薬の必要性", 
+"3-10薬と生活", "3-11家族の助け", "4-12薬の回数", 
+"4-13薬の時間", "4-14判断", "年齢.y", "性別.y", "結婚.y", 
+"同居.y", "入院回数.y", "心不全症状の有無.y", "薬物自己中断.y", 
+"心不全教室.y", "喫煙.y", "BNP.y", "区分.y", "EF.y", 
+"NYHA.y", "緊急入院.y", "入院自己中断.y", "禁煙.y", 
+"齲歯.y", "手術延期.y", "残薬不一致.y", "病名文字.y", 
+"MS", "MR", "AS", "AR", "TR", "病名コード...27", "病名コード...28", 
+"大動脈病変.y", "術式文字.y", "MICS.y", "術式コード...32", 
+"術式コード...33", "術式コード...34", "GR.y", "虚血性心疾患.y", 
+"CABG.y")
+  
+#変数名確認
+#dput(names(df3))
+
+#因子を分けて確認
+fac0 <- c("１症状", "２必要性", "3体調変化", 
+"4水分量", "5医師に質問", "6家族に話す", "7弁について", 
+"8予防法", "9水分量測定", "10看護師に伝える", 
+"11医師に伝えｒｙ", "12体重測定", "13運動量", "14家族に話す", 
+"15治療薬", "16リスク", "17体重報告", "18身体機能低下", 
+"19脈", "20身体機能予防", "21弁膜症", "22手術", "23体調連絡", 
+"24看護師に話す", "25運動", "26塩分", "27減塩醤油", 
+"28リスク", "29弁の状態", "30脈")
+
+#要因1 疾患や手術についての情報を収集する
+fac1 <- c("２必要性", "7弁について","21弁膜症", "22手術","28リスク", "29弁の状態")
+
+#要因2 手術リスクとその予防についてイメージする
+fac2 <- c("１症状","4水分量","8予防法","13運動量","15治療薬", "16リスク","18身体機能低下", "19脈", "20身体機能予防","26塩分")
+
+#要因3 手術リスク予防行動をとっている
+fac3 <- c("3体調変化", "9水分量測定","12体重測定", "17体重報告", "23体調連絡","25運動",  "27減塩醤油","30脈")
+
+#要因4 家族や医療者とのコミュニケーション
+fac4 <- c("5医師に質問", "6家族に話す", "10看護師に伝える", "11医師に伝えｒｙ","14家族に話す", "24看護師に話す")
+
+#最後に残った22質問
+fac5 <- c("１症状", "２必要性",  "4水分量", "5医師に質問", "6家族に話す", "7弁について", 
+"8予防法", "9水分量測定", "10看護師に伝える", "11医師に伝えｒｙ", "13運動量", "14家族に話す", 
+"15治療薬", "16リスク", "17体重報告", "21弁膜症", "22手術","24看護師に話す", "27減塩醤油", 
+"28リスク", "29弁の状態", "30脈")
+```
+
+```{r, eval=T, echo=F, warning=F}
+#要因毎のデータセット作る
+#全ての質問項目 30質問
+df_a <- df3 %>% 
+  select(fac0)
+
+#要因1
+df_1 <- df3 %>% 
+  select(fac1) 
+
+#要因2
+df_2 <- df3 %>% 
+  select(fac2)
+
+#要因3
+df_3 <- df3 %>% 
+  select(fac3)
+
+#要因4
+df_4 <- df3 %>% 
+  select(fac4)
+
+#最終的に残った質問項目 22質問
+df_5 <- df3 %>% 
+  select(fac5)
+```
+
+#Cronbach_alpha算出 (全ての質問項目)
+
+```{r, eval=T, echo=F, warning=F}
+#全体
+cronbach(df_a[,1:30])
+alpha(df_a[,1:30])
+```
+
+#Cronbach_alpha算出 (要因1) 疾患や手術についての情報を収集する 6質問
+
+```{r, eval=T, echo=F, warning=F}
+cronbach(df_1[,1:6])
+alpha(df_1[,1:6])
+```
+
+#Cronbach_alpha算出 (要因2) 手術リスクとその予防についてイメージする 10質問
+
+```{r, eval=T, echo=F, warning=F}
+cronbach(df_2[,1:10])
+alpha(df_2[,1:10])
+```
+
+#Cronbach_alpha算出 (要因3) 手術リスク予防行動をとっている 8質問
+
+```{r, eval=T, echo=F, warning=F}
+cronbach(df_3[,1:8])
+alpha(df_3[,1:8])
+```
+
+#Cronbach_alpha算出 (要因4) 家族や医療者とのコミュニケーション 6質問
+
+```{r, eval=T, echo=F, warning=F}
+cronbach(df_4[,1:6])
+alpha(df_4[,1:6])
+```
+
+#Cronbach_alpha算出 (最終的に残った22質問)
+
+```{r, eval=T, echo=F, warning=F}
+cronbach(df_5[,1:22])
+alpha(df_5[,1:22])
+```
+#テスト 全データ
+```{r, eval=T, echo=F, warning=F}
+#NAがあると上手く行かないので除外しておく(NAのあるケースを完全に除外)
+df_a2 <- na.omit(df_a)
+
+#主成分分析  https://data-science.gr.jp/implementation/ida_r_pca.html
+#ソフトによっては、主成分分析の結果として固有値を返すがprcompではその代わりに標準偏差(standard deviation)を返す。
+#標準偏差は、各主成分得点の標準偏差で、固有値の正の平方根に等しい。元の変数がn個あると、非ゼロである固有値および主成分(固有ベクトル)は ( ) 個求まる。
+#R で主成分分析を行う関数には princomp() と prcomp() の2種類が存在するが，princomp() にはサンプルサイズと変数の数に制限があるので，prcomp() を使えば，その点を意識せずに済む．
+pilots.pca <- prcomp(df_a2[1:30,], scale=T) ;pilots.pca
+
+#主成分の寄与率および累積寄与率をみてみる
+summary(pilots.pca)
+
+#視覚的に確認
+biplot(pilots.pca)
+
+# 主成分分析の分析結果：主成分1  $xに主成分スコアが格納されているのでそこだけ出す。
+pca1 = pilots.pca$x[,1]
+
+# 主成分分析の分析結果：主成分2
+pca2 = pilots.pca$x[,2]
+
+#図示
+par(las=1)
+plot(x=NULL,type="n",xlab="PC1",ylab="PC2",xlim=c(-5,5),ylim=c(-5,5),xaxs="i",yaxs="i",xaxt="n",yaxt="n",bty="n")
+axis(side=1,at=seq(-5,5,1),tck=1.0,lty="dotted",lwd=0.5,col="#dddddd",labels=expression(-5,-4,-3,-2,-1,0,1,2,3,4,5))
+axis(side=2,at=seq(-5,5,1),tck=1.0,lty="dotted",lwd=0.5,col="#dddddd",labels=expression(-5,-4,-3,-2,-1,0,1,2,3,4,5))
+points(x=pilots.pca$x[,1],y=pilots.pca$x[,2],pch=16,col="#ff8c00")
+pointLabel(x=pilots.pca$x[,1],y=pilots.pca$x[,2],labels=rownames(df_a),cex=0.8)
+box(bty="l")
+
+# plot(横軸：主成分1、 縦軸：主成分2)
+plot(pca1, pca2, type="n")
+
+# 表示項目に名前を表示する
+text(pca1, pca2, colnames(df_a2))
+
+#*Proportion of Variance・・・寄与率を表します。寄与率とは各主成分軸(Comp1など)がデータの何割を説明できているかを表したものです。
+#*Cumulative Proportion・・・累積寄与率を表します。累積寄与率はそれまでの主成分軸の合計でデータの何割を説明できているかを表します。
+```
+#テスト 要因1
+```{r, eval=T, echo=F, warning=F}
+#NAがあると上手く行かないので除外しておく(NAのあるケースを完全に除外)
+df_12 <- na.omit(df_1)
+
+#主成分分析  https://data-science.gr.jp/implementation/ida_r_pca.html
+#ソフトによっては、主成分分析の結果として固有値を返すがprcompではその代わりに標準偏差(standard deviation)を返す。
+#標準偏差は、各主成分得点の標準偏差で、固有値の正の平方根に等しい。元の変数がn個あると、非ゼロである固有値および主成分(固有ベクトル)は ( ) 個求まる。
+#R で主成分分析を行う関数には princomp() と prcomp() の2種類が存在するが，princomp() にはサンプルサイズと変数の数に制限があるので，prcomp() を使えば，その点を意識せずに済む．
+pilots.pca <- prcomp(df_12[1:6,], scale=T) ;pilots.pca
+
+#主成分の寄与率および累積寄与率をみてみる
+summary(pilots.pca)
+
+#視覚的に確認
+biplot(pilots.pca)
+
+# 主成分分析の分析結果：主成分1  $xに主成分スコアが格納されているのでそこだけ出す。
+pca1 = pilots.pca$x[,1]
+
+# 主成分分析の分析結果：主成分2
+pca2 = pilots.pca$x[,2]
+
+#図示
+par(las=1)
+plot(x=NULL,type="n",xlab="PC1",ylab="PC2",xlim=c(-5,5),ylim=c(-5,5),xaxs="i",yaxs="i",xaxt="n",yaxt="n",bty="n")
+axis(side=1,at=seq(-5,5,1),tck=1.0,lty="dotted",lwd=0.5,col="#dddddd",labels=expression(-5,-4,-3,-2,-1,0,1,2,3,4,5))
+axis(side=2,at=seq(-5,5,1),tck=1.0,lty="dotted",lwd=0.5,col="#dddddd",labels=expression(-5,-4,-3,-2,-1,0,1,2,3,4,5))
+points(x=pilots.pca$x[,1],y=pilots.pca$x[,2],pch=16,col="#ff8c00")
+pointLabel(x=pilots.pca$x[,1],y=pilots.pca$x[,2],labels=rownames(df_a),cex=0.8)
+box(bty="l")
+
+# plot(横軸：主成分1、 縦軸：主成分2)
+plot(pca1, pca2, type="n")
+
+# 表示項目に名前を表示する
+text(pca1, pca2, colnames(df_12))
+
+#*Proportion of Variance・・・寄与率を表します。寄与率とは各主成分軸(Comp1など)がデータの何割を説明できているかを表したものです。
+#*Cumulative Proportion・・・累積寄与率を表します。累積寄与率はそれまでの主成分軸の合計でデータの何割を説明できているかを表します。
+```
+
+#テスト 要因2
+```{r, eval=T, echo=F, warning=F}
+#NAがあると上手く行かないので除外しておく(NAのあるケースを完全に除外)
+df_22 <- na.omit(df_2)
+
+#主成分分析  https://data-science.gr.jp/implementation/ida_r_pca.html
+#ソフトによっては、主成分分析の結果として固有値を返すがprcompではその代わりに標準偏差(standard deviation)を返す。
+#標準偏差は、各主成分得点の標準偏差で、固有値の正の平方根に等しい。元の変数がn個あると、非ゼロである固有値および主成分(固有ベクトル)は ( ) 個求まる。
+#R で主成分分析を行う関数には princomp() と prcomp() の2種類が存在するが，princomp() にはサンプルサイズと変数の数に制限があるので，prcomp() を使えば，その点を意識せずに済む．
+pilots.pca <- prcomp(df_22[1:10,], scale=T) ;pilots.pca
+
+#主成分の寄与率および累積寄与率をみてみる
+summary(pilots.pca)
+
+#視覚的に確認
+biplot(pilots.pca)
+
+# 主成分分析の分析結果：主成分1  $xに主成分スコアが格納されているのでそこだけ出す。
+pca1 = pilots.pca$x[,1]
+
+# 主成分分析の分析結果：主成分2
+pca2 = pilots.pca$x[,2]
+
+#図示
+par(las=1)
+plot(x=NULL,type="n",xlab="PC1",ylab="PC2",xlim=c(-5,5),ylim=c(-5,5),xaxs="i",yaxs="i",xaxt="n",yaxt="n",bty="n")
+axis(side=1,at=seq(-5,5,1),tck=1.0,lty="dotted",lwd=0.5,col="#dddddd",labels=expression(-5,-4,-3,-2,-1,0,1,2,3,4,5))
+axis(side=2,at=seq(-5,5,1),tck=1.0,lty="dotted",lwd=0.5,col="#dddddd",labels=expression(-5,-4,-3,-2,-1,0,1,2,3,4,5))
+points(x=pilots.pca$x[,1],y=pilots.pca$x[,2],pch=16,col="#ff8c00")
+pointLabel(x=pilots.pca$x[,1],y=pilots.pca$x[,2],labels=rownames(df_a),cex=0.8)
+box(bty="l")
+
+# plot(横軸：主成分1、 縦軸：主成分2)
+plot(pca1, pca2, type="n")
+
+# 表示項目に名前を表示する
+text(pca1, pca2, colnames(df_22))
+
+#*Proportion of Variance・・・寄与率を表します。寄与率とは各主成分軸(Comp1など)がデータの何割を説明できているかを表したものです。
+#*Cumulative Proportion・・・累積寄与率を表します。累積寄与率はそれまでの主成分軸の合計でデータの何割を説明できているかを表します。
+```
+
+#テスト 要因3
+```{r, eval=T, echo=F, warning=F}
+#NAがあると上手く行かないので除外しておく(NAのあるケースを完全に除外)
+df_32 <- na.omit(df_3)
+
+#主成分分析  https://data-science.gr.jp/implementation/ida_r_pca.html
+#ソフトによっては、主成分分析の結果として固有値を返すがprcompではその代わりに標準偏差(standard deviation)を返す。
+#標準偏差は、各主成分得点の標準偏差で、固有値の正の平方根に等しい。元の変数がn個あると、非ゼロである固有値および主成分(固有ベクトル)は ( ) 個求まる。
+#R で主成分分析を行う関数には princomp() と prcomp() の2種類が存在するが，princomp() にはサンプルサイズと変数の数に制限があるので，prcomp() を使えば，その点を意識せずに済む．
+pilots.pca <- prcomp(df_32[1:8,], scale=T) ;pilots.pca
+
+#主成分の寄与率および累積寄与率をみてみる
+summary(pilots.pca)
+
+#視覚的に確認
+biplot(pilots.pca)
+
+# 主成分分析の分析結果：主成分1  $xに主成分スコアが格納されているのでそこだけ出す。
+pca1 = pilots.pca$x[,1]
+
+# 主成分分析の分析結果：主成分2
+pca2 = pilots.pca$x[,2]
+
+#図示
+par(las=1)
+plot(x=NULL,type="n",xlab="PC1",ylab="PC2",xlim=c(-5,5),ylim=c(-5,5),xaxs="i",yaxs="i",xaxt="n",yaxt="n",bty="n")
+axis(side=1,at=seq(-5,5,1),tck=1.0,lty="dotted",lwd=0.5,col="#dddddd",labels=expression(-5,-4,-3,-2,-1,0,1,2,3,4,5))
+axis(side=2,at=seq(-5,5,1),tck=1.0,lty="dotted",lwd=0.5,col="#dddddd",labels=expression(-5,-4,-3,-2,-1,0,1,2,3,4,5))
+points(x=pilots.pca$x[,1],y=pilots.pca$x[,2],pch=16,col="#ff8c00")
+pointLabel(x=pilots.pca$x[,1],y=pilots.pca$x[,2],labels=rownames(df_a),cex=0.8)
+box(bty="l")
+
+# plot(横軸：主成分1、 縦軸：主成分2)
+plot(pca1, pca2, type="n")
+
+# 表示項目に名前を表示する
+text(pca1, pca2, colnames(df_32))
+
+#*Proportion of Variance・・・寄与率を表します。寄与率とは各主成分軸(Comp1など)がデータの何割を説明できているかを表したものです。
+#*Cumulative Proportion・・・累積寄与率を表します。累積寄与率はそれまでの主成分軸の合計でデータの何割を説明できているかを表します。
+```
+
+#テスト 要因4
+```{r, eval=T, echo=F, warning=F}
+#NAがあると上手く行かないので除外しておく(NAのあるケースを完全に除外)
+df_42 <- na.omit(df_4)
+
+#主成分分析  https://data-science.gr.jp/implementation/ida_r_pca.html
+#ソフトによっては、主成分分析の結果として固有値を返すがprcompではその代わりに標準偏差(standard deviation)を返す。
+#標準偏差は、各主成分得点の標準偏差で、固有値の正の平方根に等しい。元の変数がn個あると、非ゼロである固有値および主成分(固有ベクトル)は ( ) 個求まる。
+#R で主成分分析を行う関数には princomp() と prcomp() の2種類が存在するが，princomp() にはサンプルサイズと変数の数に制限があるので，prcomp() を使えば，その点を意識せずに済む．
+pilots.pca <- prcomp(df_42[1:6,], scale=T) ;pilots.pca
+
+#主成分の寄与率および累積寄与率をみてみる
+summary(pilots.pca)
+
+#視覚的に確認
+biplot(pilots.pca)
+
+# 主成分分析の分析結果：主成分1  $xに主成分スコアが格納されているのでそこだけ出す。
+pca1 = pilots.pca$x[,1]
+
+# 主成分分析の分析結果：主成分2
+pca2 = pilots.pca$x[,2]
+
+#図示
+par(las=1)
+plot(x=NULL,type="n",xlab="PC1",ylab="PC2",xlim=c(-5,5),ylim=c(-5,5),xaxs="i",yaxs="i",xaxt="n",yaxt="n",bty="n")
+axis(side=1,at=seq(-5,5,1),tck=1.0,lty="dotted",lwd=0.5,col="#dddddd",labels=expression(-5,-4,-3,-2,-1,0,1,2,3,4,5))
+axis(side=2,at=seq(-5,5,1),tck=1.0,lty="dotted",lwd=0.5,col="#dddddd",labels=expression(-5,-4,-3,-2,-1,0,1,2,3,4,5))
+points(x=pilots.pca$x[,1],y=pilots.pca$x[,2],pch=16,col="#ff8c00")
+pointLabel(x=pilots.pca$x[,1],y=pilots.pca$x[,2],labels=rownames(df_a),cex=0.8)
+box(bty="l")
+
+# plot(横軸：主成分1、 縦軸：主成分2)
+plot(pca1, pca2, type="n")
+
+# 表示項目に名前を表示する
+text(pca1, pca2, colnames(df_42))
+
+#*Proportion of Variance・・・寄与率を表します。寄与率とは各主成分軸(Comp1など)がデータの何割を説明できているかを表したものです。
+#*Cumulative Proportion・・・累積寄与率を表します。累積寄与率はそれまでの主成分軸の合計でデータの何割を説明できているかを表します。
+```
+
+#テスト 最終的に残った22質問
+```{r, eval=T, echo=F, warning=F}
+#NAがあると上手く行かないので除外しておく(NAのあるケースを完全に除外)
+df_52 <- na.omit(df_5)
+
+#主成分分析  https://data-science.gr.jp/implementation/ida_r_pca.html
+#ソフトによっては、主成分分析の結果として固有値を返すがprcompではその代わりに標準偏差(standard deviation)を返す。
+#標準偏差は、各主成分得点の標準偏差で、固有値の正の平方根に等しい。元の変数がn個あると、非ゼロである固有値および主成分(固有ベクトル)は ( ) 個求まる。
+#R で主成分分析を行う関数には princomp() と prcomp() の2種類が存在するが，princomp() にはサンプルサイズと変数の数に制限があるので，prcomp() を使えば，その点を意識せずに済む．
+pilots.pca <- prcomp(df_52[1:22,], scale=T) ;pilots.pca
+
+#主成分の寄与率および累積寄与率をみてみる
+summary(pilots.pca)
+
+#視覚的に確認
+biplot(pilots.pca)
+
+# 主成分分析の分析結果：主成分1  $xに主成分スコアが格納されているのでそこだけ出す。
+pca1 = pilots.pca$x[,1]
+
+# 主成分分析の分析結果：主成分2
+pca2 = pilots.pca$x[,2]
+
+#図示
+par(las=1)
+plot(x=NULL,type="n",xlab="PC1",ylab="PC2",xlim=c(-5,5),ylim=c(-5,5),xaxs="i",yaxs="i",xaxt="n",yaxt="n",bty="n")
+axis(side=1,at=seq(-5,5,1),tck=1.0,lty="dotted",lwd=0.5,col="#dddddd",labels=expression(-5,-4,-3,-2,-1,0,1,2,3,4,5))
+axis(side=2,at=seq(-5,5,1),tck=1.0,lty="dotted",lwd=0.5,col="#dddddd",labels=expression(-5,-4,-3,-2,-1,0,1,2,3,4,5))
+points(x=pilots.pca$x[,1],y=pilots.pca$x[,2],pch=16,col="#ff8c00")
+pointLabel(x=pilots.pca$x[,1],y=pilots.pca$x[,2],labels=rownames(df_a),cex=0.8)
+box(bty="l")
+
+# plot(横軸：主成分1、 縦軸：主成分2)
+plot(pca1, pca2, type="n")
+
+# 表示項目に名前を表示する
+text(pca1, pca2, colnames(df_52))
+
+#*Proportion of Variance・・・寄与率を表します。寄与率とは各主成分軸(Comp1など)がデータの何割を説明できているかを表したものです。
+#*Cumulative Proportion・・・累積寄与率を表します。累積寄与率はそれまでの主成分軸の合計でデータの何割を説明できているかを表します。
+```
+
